@@ -6,15 +6,37 @@ import numpy as np
 
 import time
 
-import os
+import socket
 
-from matplotlib import pyplot as plt
+
 
 # define a video capture object
-vid = cv2.VideoCapture(2)
+vid = cv2.VideoCapture(0)
 #id.set(cv2.CAP_PROP_EXPOSURE, 40)
 #print(vid.get(cv2.CAP_PROP_EXPOSURE))
-c = 1
+
+s = socket.socket()
+print("A")
+
+port = 12354
+try:
+  s.bind(('',port))
+except:
+  s.bind(('',port+1))
+print("B")
+
+s.listen(5)
+print("C")
+
+count = 1
+
+testfingerx= 67
+testfingery= 100
+
+
+iterations = 7
+
+examplex=100
 
 crop = 100
 
@@ -27,26 +49,181 @@ corner3yls=deque()
 corner4xls=deque()
 corner4yls=deque()
 
-xout=-1
-yout=-1
+"""xout=-1
+yout=-1"""
 
-corner1x= 0
-corner1y= 0
+corner1x = 0
+corner1y = 0
 corner2x = 0
 corner2y = 0
 corner3x = 0
 corner3y = 0
 corner4x = 0
 corner4y = 0
+# Establish connection with client.
+connection = False
+while 1==1:
+    c, addr = s.accept()  
+    
+      
 
-drawCorner1x = 0
-drawCorner1y = 0
-drawCorner2x = 0
-drawCorner2y = 0
-drawCorner3x = 0
-drawCorner3y = 0
-drawCorner4x = 0
-drawCorner4y = 0
+    print ('Got connection from', addr )
+    break
+
+xprev = -1
+yprev = -1
+
+#send stuff
+def sendData(x, y, xsize, ysize):
+    global xprev
+    global yprev
+    xstr = 'x'+str(x)
+    ystr = 'y'+str(y)
+    if(xprev!=x or yprev!=y):
+        
+        c.send(xstr.encode())
+        c.send(ystr.encode())
+    xprev = x
+    yprev = y
+
+def revisedScaler(inputx, inputy, corner1xin, corner1yin, corner2xin, corner2yin, corner3xin, corner3yin, corner4xin, corner4yin):
+
+    corner1x=corner1xin
+    corner1y=corner1yin
+    corner2x=corner2xin
+    corner2y=corner2yin
+    corner3x=corner3xin
+    corner3y=corner3yin
+    corner4x=corner4xin
+    corner4y=corner4yin
+
+    go = 5
+    locationx=32
+    while go>0:
+        topMiddle=(((corner1x+corner2x)/2),((corner1y+corner2y)/2))
+        bottomMiddle=(((corner3x+corner4x)/2),((corner3y+corner4y)/2))
+        slope,intercept=lineFinder(topMiddle[0],bottomMiddle[0],topMiddle[1],bottomMiddle[1])
+        pointx=(fingery-intercept)/slope
+
+        go=go-1
+
+        if(inputx>pointx):
+            corner2x=topMiddle[0]
+            corner2y=topMiddle[1]
+            corner3x=bottomMiddle[0]
+            corner3y=bottomMiddle[1]
+            locationx=locationx+2**go
+        else:
+            corner1x=topMiddle[0]
+            corner1y=topMiddle[1]
+            corner4x=bottomMiddle[0]
+            corner4y=bottomMiddle[1]
+            locationx=locationx-2**go
+
+    go = 5
+    locationy=32
+    while go>0:
+        leftMiddle=(((corner2x+corner3x)/2),((corner2y+corner3y)/2))
+        rightMiddle=(((corner4x+corner1x)/2),((corner4y+corner1y)/2))
+        slope,intercept=lineFinder(leftMiddle[0],rightMiddle[0],leftMiddle[1],rightMiddle[1])
+        pointy=(fingery-intercept)/slope
+
+        go=go-1
+
+        if(inputy>pointy):
+            corner3x=leftMiddle[0]
+            corner3y=leftMiddle[1]
+            corner4x=rightMiddle[0]
+            corner4y=rightMiddle[1]
+            locationy=locationy+2**go
+        else:
+            corner1x=rightMiddle[0]
+            corner1y=rightMiddle[1]
+            corner2x=leftMiddle[0]
+            corner2y=leftMiddle[1]
+            locationy=locationy-2**go
+
+    return locationx, locationy
+    
+
+
+#scale finger from physical paper to virtual paper? Idk
+def fingerScaler(iterations, inputx, inputy, corner1xin, corner1yin, corner2xin, corner2yin, corner3xin, corner3yin, corner4xin, corner4yin):
+    iteration = 1
+
+    loop = True
+    direction = 1
+
+    previousTopx = corner2xin
+    previousTopy = corner2yin
+    previousBottomx = corner3xin
+    previousBottomy = corner3yin
+
+    limitxTopRight = corner1xin
+    limitxTopLeft = corner2xin
+    limitxBottomRight = corner4xin
+    limitxBottomLeft = corner3xin
+
+    limityTopRight = corner1yin
+    limityTopLeft = corner2yin
+    limityBottomRight = corner4yin
+    limityBottomLeft = corner3yin
+
+    #find x
+    index =0
+    while loop==True:
+        splitTopx= midpointFinder(direction, previousTopx, limitxTopLeft, limitxTopRight, iteration)
+        splitTopy= midpointFinder(direction, previousTopy, limityTopLeft, limityTopRight, iteration)
+        splitBottomx = midpointFinder(direction, previousBottomx, limitxBottomLeft, limitxBottomRight, iteration)
+        splitBottomy = midpointFinder(direction, previousBottomy, limityBottomLeft, limityBottomRight, iteration)
+        
+        intercept, slope = lineFinder(splitBottomx, splitTopx, splitBottomy, splitTopy)
+        if(fingerx):
+            direction = 1
+            index = index + 2**iteration
+        else:
+            direction = -1
+            index = index - 2**iteration
+
+        previousTopx = splitTopx 
+
+
+
+        iteration=iteration+1
+
+        if (iteration>=iterations):
+            loop = False
+
+    #find point on edge 3
+
+    #find point on edge 4
+
+    #convert edge points to x and y values
+    x=1
+    y=1
+    return index
+
+#function takes 2 values (function used for each edge) and finds a kind of weighted midpoint idk how to explain it
+def midpointFinder(direction, previous, limit1, limit2, iteration):
+    width = limit2-limit1
+    move = direction*(width/(2**iteration))
+    new= previous+move
+
+    if(new>previous):
+        return previous,new
+    else:
+        return new,previous
+
+#find intercept and slope from 2 points
+def lineFinder(x1,x2,y1,y2):
+    try:
+        slope= (y1-y2)/(x1-x2)
+        intercept= y2-(slope*x2)
+
+        return (slope,intercept)
+    except:
+        return (0,0)
+
 
 def lineLister(corner1xin, corner1yin, corner2xin, corner2yin, corner3xin, corner3yin, corner4xin, corner4yin):
     corner1xls.append(corner1xin)
@@ -77,10 +254,16 @@ def lineLister(corner1xin, corner1yin, corner2xin, corner2yin, corner3xin, corne
     #print(corner1xin)
     return int(np.mean(corner1xls)),int(np.mean(corner1yls)),int(np.mean(corner2xls)),int(np.mean(corner2yls)),int(np.mean(corner3xls)),int(np.mean(corner3yls)),int(np.mean(corner4xls)),int(np.mean(corner4yls))
 
+drawCorner1x,drawCorner1y,drawCorner2x,drawCorner2y,drawCorner3x,drawCorner3y,drawCorner4x,drawCorner4y = 0,0,0,0,0,0,0,0
 
 while(True):
+    papershow = np.zeros((64,64))
     time1=time.time()
-    _, frame = vid.read()
+    #_, frame = vid.read()
+    frameO = cv2.imread(r"/home/lee/images/c1.png")
+
+    frame = cv2.resize(frameO,(640,480))
+
     
     
     # paper mask
@@ -88,7 +271,8 @@ while(True):
     high_ong = np.array([180, 133, 255])
     mask = cv2.inRange(hsv, low_ong, high_ong)"""
 
-    frameCrop= frame[crop:(480-crop),0:640]
+    #frameCrop= frame[crop:(480-crop),0:640]
+    frameCrop = frame
     #paper line finder 2.0
     frameGrey = cv2.cvtColor(frameCrop, cv2.COLOR_BGR2GRAY)
     frameOBlur = cv2.GaussianBlur(frameGrey, (5,5), 0)
@@ -131,7 +315,7 @@ while(True):
 
     
     lineColor = (0,0,255)
-    trackCorner = 150>c
+    trackCorner = 150>count
     
     if trackCorner:
         try:
@@ -169,6 +353,9 @@ while(True):
     cv2.line(frameCrop, (drawCorner2x, drawCorner2y), (drawCorner3x, drawCorner3y), lineColor, 15)
     cv2.line(frameCrop, (drawCorner3x, drawCorner3y), (drawCorner4x, drawCorner4y), lineColor, 15)
     cv2.line(frameCrop, (drawCorner4x, drawCorner4y), (drawCorner1x, drawCorner1y), lineColor, 15)
+
+    cornersArray= np.array([[drawCorner1x,drawCorner2x, drawCorner3x, drawCorner4x],[drawCorner1y,drawCorner2y,drawCorner3y,drawCorner4y]])
+    center = np.array([np.mean(cornersArray[0]),np.mean(cornersArray[1])])
     #lines crap
     """rho = 1  # distance resolution in pixels of the Hough grid
     theta = np.pi / 180  # angular resolution in radians of the Hough grid
@@ -212,43 +399,118 @@ while(True):
     except:
         print("no finger")
 
+#test finger location
+
+    fingerx = testfingerx
+    fingery = testfingery
+
 
     if fingerx >=0 and fingery >=0:
         cv2.circle(frameCrop, (fingerx, fingery), 4, (0,255,0), -1)
         cv2.circle(shd_mask, (fingerx, fingery), 4, (255), -1)
 
+    
     #cv2.imshow('shadow', shd_mask)
     #cv2.imshow('paper', paper_bound)
-    cv2.imshow('original', frameCrop)
+    cv2.circle(frameCrop, (int(center[0]),int(center[1])), 4, (0,0,255), -1)
+    
 
     #cv2.imshow('finger', fing_mask)
     #cv2.imshow('frameBlur', maskBlur1)
     #cv2.imshow('egde', maskEdge)
     #cv2.imshow('line', frameOEdge)
 
-    c=c+1
+    count=count+1
 
-    #scale to paper
-    A11= np.zeros((2508,3840))
-    cv2.circle(A11, (fingerx, fingery), 4, (255), -1)
+    
 
-    xout = fingerx
+    edge1 =(int(np.mean((drawCorner1x,drawCorner2x))),int(np.mean((drawCorner1y,drawCorner2y))))
+    edge2 =(int(np.mean((drawCorner2x,drawCorner3x))),int(np.mean((drawCorner2y,drawCorner3y))))
+    edge3 =(int(np.mean((drawCorner3x,drawCorner4x))),int(np.mean((drawCorner3y,drawCorner4y))))
+    edge4 =(int(np.mean((drawCorner4x,drawCorner1x))),int(np.mean((drawCorner4y,drawCorner1y)))) 
+    #cv2.imshow('paper', paper)
+    #get mean point between corners and draw line to opposide side mean point between corners
+    cv2.line(frameCrop, edge1,edge3, (255,0,0),2)
+    cv2.line(frameCrop, edge2,edge4, (255,0,0),2)
+
+    #cv2.line(frameCrop, (int(np.mean()),int(np.mean())),(int(np.mean()),int(np.mean())),(255,0,0),2)
+    """ cv2.line(frameCrop, (int(np.mean(corner1x))), (480-2*crop)),(int(center[0]),0),(255,0,0),2)
+    cv2.line(frameCrop, (640, int(center[1])),(0, int(center[1])),(255,0,0),2)"""
+    #find x and y of point
+    """
+    #convert paper outline to polar coordinates
+
+    #rotate a line around
+    #start at 0 radians
+    #progress ray until true
+    #distance from center is distance
+
+    #divide distance to edge in actual paper by distance to edge on paper_bound to get an array of angles and ratios
+
+    #multiply finger point by ratio to get actual finger location"""
+
+    #convert point in 16384 regions
+
+    #find x area
+    """left = 0
+    weight = 0
+    while iterations>0:
+        if (fingerx>((corner3x+corner4x)/2) or fingerx>((corner1x+corner2x)/2)):
+            left = 0
+            weight = weight + 2**(iterations-1)
+        else:
+            left = 1
+
+
+        iterations=iterations-1"""
+
+    """#alternate method: convert edges to functions
+    slope,intercept = lineFinder(corner2x,corner3x,corner2y,corner3y)
+    print(slope,intercept)
+
+    examplex = examplex+1
+    if (examplex>160):
+        examplex=0
+        """
+    
+    """excircley = int(((examplex*slope))+intercept)
+    cv2.circle(frameCrop, (int(examplex), excircley), 10, (200,200,200), -1)
+    cv2.circle(frameCrop, (100, 100), 10, (200,200,200), -1)
+    print("examplex")
+    print(examplex)
+    print("exampley")
+    print(excircley)"""
+
+    cv2.imshow('original', frameCrop)
+    
+    """xout = fingerx
     yout = fingery
+
     if yout>=0 and xout >=0:
         print (xout)
-        print (yout)
+        print (yout)"""
 
-    cv2.imshow('paper',A11)
+    testx, testy= revisedScaler(fingerx, fingery, drawCorner1x, drawCorner1y, drawCorner2x, drawCorner2y, drawCorner3x, drawCorner3y, drawCorner4x, drawCorner4y)
+    
+    print("rawinput: "+str(fingerx)+", "+str(fingery))
+    print("scaledoutput: "+str(testx)+", "+str(testy))
+    papershow[testy, testx]=1
+    cv2.imshow('paper', papershow)
+
     if cv2.waitKey(1) & 0xFF == ord('r'):
-        c=0
+        count=0
     if cv2.waitKey(1) & 0xFF == ord('q'):
         status = cv2.imwrite('/home/lee/Pictures/save.png',frameCrop)
         print(status)
         break
     time2 = time.time()
     fps = 1/(time2-time1)
+
+    #outputting
+    sendData(testx, testy, 64, 64)
     #print(fps)
-    
+
+
 
 # After the loop release the cap object
 vid.release()

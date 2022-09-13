@@ -15,6 +15,8 @@ port = 12354
 port1 = port+1
 
 sizex,sizey = pyautogui.size()
+
+pyautogui.moveTo(sizex/2,sizey/2,duration=0)
  
 # connect to the server on local computer
 
@@ -68,7 +70,7 @@ while 1==1:
         if(previousx!=-1 and previousy!=-1 and recievedx!=-1 and recievedy!=-1):
             xmove= recievedx-previousx
             ymove= recievedy-previousy
-            pyautogui.moveRel(xmove,ymove)
+            pyautogui.moveRel(xmove, ymove, duration=0)
 
         
 

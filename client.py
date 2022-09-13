@@ -72,6 +72,9 @@ while 1==1:
             ymove= recievedy-previousy
             pyautogui.moveRel(xmove, ymove, duration=0)
 
+        previousx = recievedx
+        previousy = recievedx
+
         
 
         
